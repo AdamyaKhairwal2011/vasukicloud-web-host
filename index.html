@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vasuki Cloud Storage</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+<style>
+/* ------------------ GLOBAL ------------------ */
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif;transition:all .18s ease}
+body{background:rgb(255,255,154);min-height:100vh;color:#000}
+button{cursor:pointer;border:none;outline:none}
+a{text-decoration:none}
+h2{font-weight:700;color:#334e68;margin-bottom:10px}
+.hidden{display:none}
+
+/* ------------------ HEADER ------------------ */
+header{background:linear-gradient(90deg,#0078d4,#005fa3);color:#fff;padding:14px 18px;font-size:1.2rem;font-weight:700;box-shadow:0 3px 15px rgba(0,0,0,0.15);display:flex;align-items:center;justify-content:space-between}
+.header-actions{display:flex;gap:10px;align-items:center}
+.header-actions button{background:rgba(255,255,255,0.12);color:#fff;padding:8px 12px;border-radius:8px;font-weight:600}
+
+/* ------------------ PAGE CONTAINER ------------------ */
+.container{max-width:1100px;margin:28px auto;padding:0 18px}
+
+/* ------------------ AUTH BOX (modal-esque) ------------------ */
+#authBox{background:#fff;border-radius:12px;padding:26px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.12);max-width:420px;margin:22px auto;}
+#authBox img.logo{width:84px;margin-bottom:12px}
+#authBox input{width:88%;padding:10px 12px;margin:10px 0;border:1px solid #dfe7ef;border-radius:10px;font-size:0.98rem;background:#fbfdff}
+#authBox button{margin:8px;padding:10px 18px;border-radius:10px;font-weight:700;background:#0078d4;color:#fff}
+#authModal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,0.35);z-index:60}
+
+/* ------------------ WELCOME */
+.welcome-auth{font-family:arial;line-height:50px;height:220px;display:flex;align-items:center;justify-content:center;flex-direction:column}
+.bg-black{background-color:black;color:yellow;max-width:fit-content;padding:0px 8px;transform:rotate(3deg);}
+.bg-black .content{transform:rotate(-3deg)}
+
+/* ------------------ APP DASHBOARD ------------------ */
+#app{animation:fadeIn .6s ease}
+.logout{background:#e63946;padding:8px 14px;border-radius:8px;color:#fff;font-weight:700}
+
+.upload-box{background:#fff;padding:16px;border-radius:12px;margin-bottom:18px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;box-shadow:0 5px 20px rgba(0,0,0,0.06)}
+.upload-box input[type=file]{flex:1;padding:8px;font-size:0.95rem}
+.upload-box button{background:#0078d4;color:#fff;padding:8px 16px;border-radius:8px;font-weight:700;margin-left:10px}
+.upload-box select{padding:8px;border-radius:8px;border:1px solid #ccc}
+
+
+.hidden {
+  display: none !important;
+}
+
+
+.table-wrap{overflow-x:auto}
+#filesTable{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,0.06)}
+#filesTable th,#filesTable td{padding:12px 14px;text-align:left;border-bottom:1px solid #f0f0f0}
+#filesTable th{background:#eef3fa;font-weight:700;color:#334e68}
+#filesTable tr:hover{background:#f9fbff}
+#filesTable button{padding:7px 12px;border-radius:6px;font-size:0.85rem;font-weight:600;margin-right:6px}
+#filesTable button.download{background:#16a34a;color:#fff}
+#filesTable button.delete{background:#e63946;color:#fff}
+#filesTable button.preview{background:#2563eb;color:#fff}
+#filesTable button.rename{background:#9333ea;color:#fff}
+#filesTable button.share{background:#0ea5a4;color:#fff}
+
+/* ------------------ PREVIEW / SHARE BOX ------------------ */
+#previewBox{margin-top:18px;background:#fff;border-radius:12px;padding:18px;min-height:160px;display:flex;align-items:center;justify-content:center;box-shadow:0 5px 20px rgba(0,0,0,0.06);overflow:auto}
+#previewBox img{max-width:100%;max-height:380px;border-radius:8px}
+#previewBox pre{background:#f8fafc;padding:12px;border-radius:10px;width:100%;overflow:auto}
+
+/* ------------------ SMALL UI HELPERS ------------------ */
+.small{font-size:0.85rem;color:#334e68}
+.copyLink{display:inline-flex;gap:8px;align-items:center}
+.copyLink input{padding:8px;border-radius:8px;border:1px solid #e3eef9;width:360px}
+
+/* ------------------ ANIMATIONS ------------------ */
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* ------------------ RESPONSIVE ------------------ */
+@media(max-width:768px){header{font-size:1rem;padding:10px}#authBox{padding:18px}#filesTable th,#filesTable td{font-size:0.9rem;padding:8px}.copyLink input{width:180px}}
+
+/* ------------------ THREE DOT MENU ------------------ */
+.three-dot-btn {
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  position: relative;
+}
+.three-dot-menu {
+  position: absolute;
+  top: 28px;
+  right: 0;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+  display: none;
+  min-width: 130px;
+  z-index: 1000;
+  flex-direction: column;
+}
+.three-dot-menu button {
+  padding: 8px 12px;
+  width: 100%;
+  text-align: left;
+  font-size: 0.9rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  z-index: 1000;
+}
+.three-dot-menu button:hover {
+  background: #eef3fa;
+}
+
+</style>
+</head>
+<body>
+<header>
+  <div>Vasuki Cloud Storage</div>
+  <div class="header-actions">
+    <button id="openAuthBtn">Login</button>
+    <button id="btnMyFiles" class="hidden">My Files</button>
+  </div>
+</header>
+
+<div class="container">
+  <div id="landing">
+    <h1 class="welcome-auth">Get Solving On vCloud <br>
+      <div class="bg-black"><div class="content"> Access Content</div></div> Anywhere, Anytime.
+    </h1>
+    <div style="text-align:center;margin-top:8px">
+      <button id="openAuthCallToAction" style="background:#0078d4;color:#fff;padding:12px 18px;border-radius:10px;font-weight:700">Sign in / Sign up</button>
+    </div>
+  </div>
+
+  <!-- AUTH MODAL (starts hidden) -->
+  <div id="authModal" class="hidden">
+    <div id="authBox">
+      <img src="./assets/logo-black.png" alt="logo" class="logo" onerror="this.style.display='none'">
+      <input type="text" id="username" placeholder="Username" autocomplete="username">
+      <input type="password" id="password" placeholder="Password" autocomplete="current-password">
+      <div style="margin-top:8px;display:flex;gap:8px;justify-content:center">
+        <button onclick="signUp()">Sign Up</button>
+        <button onclick="signIn()">Login</button>
+        <button onclick="closeAuth()" style="background:#666;color:#fff">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- APP (hidden until login) -->
+  <div id="app" class="hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div>
+        <strong class="small">Signed in as</strong>
+        <div id="currentUserLabel" class="small"></div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="logout" onclick="signOut()">Logout</button>
+      </div>
+    </div>
+
+    <div class="upload-box">
+      <input type="hidden" id="userId">
+      <input type="file" id="fileInput">
+      <select id="maxSizeSelect">
+        <option value="5242880">Max 5 MB</option>
+        <option value="10485760">Max 10 MB</option>
+        <option value="20971520">Max 20 MB</option>
+      </select>
+      <button onclick="uploadFile()">Upload</button>
+    </div>
+
+    <h2>Your Files</h2>
+    <div class="table-wrap">
+      <table id="filesTable">
+        <thead>
+          <tr><th>Filename</th><th>Uploaded</th><th>Size</th><th>Actions</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <h2>Preview</h2>
+    <div id="previewBox">Select a file to preview</div>
+  </div>
+
+  <!-- SHARE VIEW (public) -->
+  <div id="shareView" class="hidden">
+    <h2>Shared File</h2>
+    <div id="shareInfo" class="small"></div>
+    <div id="sharePreview" style="margin-top:12px"></div>
+    <div style="margin-top:12px" id="shareActions"></div>
+  </div>
+</div>
+
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// --- CONFIG --- (keep keys secret in production; using anon key for demo)
+const SUPABASE_URL = "https://aitckloahlwemlekaour.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFpdGNrbG9haGx3ZW1sZWthb3VyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyOTQ3MTMsImV4cCI6MjA3MTg3MDcxM30.uQjQLSz0mQuuArPQ_F8u-suQ-6T0e9bF11ahQtSw6yA";
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const TABLE = "cloud";
+let currentUser = null;
+
+// --- UI ELEMENTS ---
+const authModal = document.getElementById('authModal');
+const openAuthBtn = document.getElementById('openAuthBtn');
+const openAuthCallToAction = document.getElementById('openAuthCallToAction');
+const btnMyFiles = document.getElementById('btnMyFiles');
+const appEl = document.getElementById('app');
+const landing = document.getElementById('landing');
+const previewBox = document.getElementById('previewBox');
+const filesTbody = document.querySelector('#filesTable tbody');
+
+// --- HELPERS ---
+function show(el){el.classList.remove('hidden')}
+function hide(el){el.classList.add('hidden')}
+function formatBytes(bytes){if(bytes===0)return'0 B';const k=1024,s=['B','KB','MB','GB'],i=Math.floor(Math.log(bytes)/Math.log(k));return(parseFloat((bytes/Math.pow(k,i)).toFixed(2)))+' '+s[i];}
+function arrayBufferToBase64(buf){let bin='',bytes=new Uint8Array(buf);for(let i=0;i<bytes.length;i++)bin+=String.fromCharCode(bytes[i]);return btoa(bin);} 
+function base64ToBlob(base64,mime){const bin=atob(base64),arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return new Blob([arr],{type:mime});}
+function escapeHtml(s){return(s+"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m]));}
+
+// generate a short secure token
+function genToken(len = 28) {
+  const arr = new Uint8Array(len);
+  crypto.getRandomValues(arr);
+  let out = '';
+  for (let i = 0; i < arr.length; i++) {
+    out += arr[i].toString(36);
+  }
+  return out.slice(0, len);
+}
+
+// --- AUTH UI ---
+openAuthBtn.addEventListener('click',()=>{show(authModal)});
+openAuthCallToAction.addEventListener('click',()=>{show(authModal)});
+window.closeAuth = function () {
+  authModal.classList.add('hidden');
+};
+
+
+
+// --- AUTH LOGIC (simple demo; in production use Supabase Auth) ---
+window.signUp = async function(){
+  const username=document.getElementById('username').value.trim();
+  const password=document.getElementById('password').value;
+  if(!username||!password)return alert('Enter username & password');
+  // note: storing plaintext passwords is insecure. For demo only.
+  const { error } = await supabase.from('users').insert([{ username, password }]);
+  if(error) return alert('Signup error: '+error.message);
+  alert('Signup successful — please login.');
+};
+window.signIn = async function(){
+  const username=document.getElementById('username').value.trim();
+  const password=document.getElementById('password').value;
+  if(!username||!password) return alert('Enter username & password');
+  const { data, error } = await supabase.from('users').select('*').eq('username',username).eq('password',password).single();
+  if(error||!data) return alert('Invalid login');
+  currentUser = data;
+  document.getElementById('userId').value = currentUser.id;
+  document.getElementById('currentUserLabel').textContent = username;
+  hide(authModal); hide(landing); show(appEl); show(btnMyFiles);
+  openAuthBtn.classList.add('hidden');
+  loadFiles();
+};
+window.signOut = function(){ currentUser=null; hide(appEl); show(landing); hide(btnMyFiles); openAuthBtn.classList.remove('hidden'); document.getElementById('currentUserLabel').textContent=''; }
+
+// --- UPLOAD ---
+window.uploadFile = async function(){
+  if(!currentUser) return alert('Login first');
+  const f=document.getElementById('fileInput').files[0];
+  if(!f) return alert('Select a file');
+  const max=parseInt(document.getElementById('maxSizeSelect').value,10);
+  if(f.size>max) return alert('File too big. Max '+formatBytes(max));
+  const buf = await f.arrayBuffer();
+  const base64 = arrayBufferToBase64(buf);
+  const payload = { user_id: currentUser.id, filename: f.name, mime_type: f.type||'application/octet-stream', data_base64: base64, size_bytes: f.size, uploaded_at: new Date().toISOString() };
+  const { error } = await supabase.from(TABLE).insert([payload]);
+  if(error) return alert('Upload failed: '+error.message);
+  document.getElementById('fileInput').value='';
+  await loadFiles();
+};
+
+// --- MODIFY loadFiles() --- 
+async function loadFiles() {
+  if (!currentUser) return;
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select('id,filename,mime_type,size_bytes,uploaded_at,share_token,share_expires_at')
+    .eq('user_id', currentUser.id)
+    .order('uploaded_at', { ascending: false });
+  if (error) return console.error(error);
+
+  filesTbody.innerHTML = '';
+// --- THREE DOT LOGIC FIXED FOR BOTTOM EDGE ---
+// Create three-dot menu dynamically and attach to body
+data.forEach(f => {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>${escapeHtml(f.filename)}</td>
+    <td>${new Date(f.uploaded_at).toLocaleString()}</td>
+    <td>${formatBytes(f.size_bytes||0)}</td>
+    <td>
+      <button class="three-dot-btn">&#8942;</button>
+    </td>
+  `;
+  filesTbody.appendChild(tr);
+
+  const btn = tr.querySelector('.three-dot-btn');
+
+  btn.addEventListener('click', e => {
+    // Close any existing menu
+    const existingMenu = document.querySelector('.three-dot-menu-body');
+    if (existingMenu) existingMenu.remove();
+
+    // Create menu container
+    const menu = document.createElement('div');
+    menu.classList.add('three-dot-menu-body');
+    menu.style.position = 'fixed';
+    menu.style.display = 'flex';
+    menu.style.flexDirection = 'column';
+    menu.style.background = '#fff';
+    menu.style.border = '1px solid #ccc';
+    menu.style.borderRadius = '8px';
+    menu.style.boxShadow = '0 4px 16px rgba(0,0,0,0.15)';
+    menu.style.zIndex = 9999;
+
+    // Add buttons
+    const actions = [
+      { label: 'Download', fn: () => downloadFile(f.id) },
+      { label: 'Preview', fn: () => previewFile(f.id) },
+      { label: 'Rename', fn: () => promptRename(f.id, f.filename) },
+      { label: f.share_token ? 'Manage Share' : 'Share', fn: () => createShare(f.id, f.share_token||'') },
+      { label: 'Delete', fn: () => deleteFile(f.id) }
+    ];
+    actions.forEach(a => {
+      const b = document.createElement('button');
+      b.textContent = a.label;
+      b.style.padding = '6px 14px';
+      b.style.border = 'none';
+      b.style.background = 'none';
+      b.style.textAlign = 'left';
+      b.style.cursor = 'pointer';
+      b.addEventListener('click', () => { a.fn(); menu.remove(); });
+      b.addEventListener('mouseenter', () => b.style.background = '#f0f0f0');
+      b.addEventListener('mouseleave', () => b.style.background = 'none');
+      menu.appendChild(b);
+    });
+
+    document.body.appendChild(menu);
+
+    // Position menu
+    const rect = btn.getBoundingClientRect();
+    menu.style.left = `${rect.left}px`;
+
+    // Check if menu would overflow bottom
+    const menuHeight = actions.length * 36; // approximate button height
+    if (rect.bottom + menuHeight > window.innerHeight) {
+      menu.style.top = `${rect.top - menuHeight}px`; // open upwards
+    } else {
+      menu.style.top = `${rect.bottom}px`; // open downwards
+    }
+
+    e.stopPropagation();
+  });
+});
+
+// Close menu when clicking anywhere else
+document.addEventListener('click', () => {
+  const existingMenu = document.querySelector('.three-dot-menu-body');
+  if (existingMenu) existingMenu.remove();
+});
+
+
+  // close menus if clicked outside
+  document.addEventListener('click', e => {
+    if (!e.target.classList.contains('three-dot-btn')) {
+      document.querySelectorAll('.three-dot-menu').forEach(menu => menu.style.display = 'none');
+    }
+  });
+}
+
+window.loadFiles = loadFiles;
+
+// --- DELETE ---
+window.deleteFile = async function(id){ if(!confirm('Delete this file?')) return; const { error } = await supabase.from(TABLE).delete().eq('id',id); if(error) return alert('Delete failed: '+error.message); loadFiles(); };
+
+// --- PREVIEW ---
+window.previewFile = async function(id){
+  const { data, error } = await supabase.from(TABLE).select('filename,mime_type,data_base64').eq('id',id).single();
+  const box = document.getElementById('previewBox'); box.innerHTML='';
+  if(error||!data) return box.textContent='Preview failed.';
+  const { mime_type, data_base64 } = data;
+  if(mime_type && mime_type.startsWith('image/')){
+    const blob = base64ToBlob(data_base64,mime_type); const url = URL.createObjectURL(blob); const img=document.createElement('img'); img.src=url; box.appendChild(img);
+  } else if(mime_type && (mime_type.startsWith('text/')||mime_type.includes('json')||mime_type.includes('xml'))){
+    const text = atob(data_base64);
+    const pre = document.createElement('pre'); pre.textContent = text.slice(0,200000);
+    box.appendChild(pre);
+  } else {
+    const p = document.createElement('div'); p.textContent = 'Preview not available for this file type. Use Download.'; box.appendChild(p);
+  }
+};
+
+// --- DOWNLOAD ---
+window.downloadFile = async function(id){
+  const { data, error } = await supabase.from(TABLE).select('filename,mime_type,data_base64').eq('id',id).single();
+  if(error||!data) return alert('Download failed');
+  const blob = base64ToBlob(data.data_base64,data.mime_type);
+  const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=data.filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+};
+
+// --- RENAME ---
+window.promptRename = function(id,current){ const newName = prompt('Rename file:',current); if(newName===null) return; renameFile(id,newName); }
+async function renameFile(id,newName){ const { error } = await supabase.from(TABLE).update({ filename: newName, updated_at: new Date().toISOString() }).eq('id',id); if(error) return alert('Rename failed: '+error.message); loadFiles(); }
+
+// --- SHARE MANAGEMENT ---
+window.createShare = async function(fileId,existingToken){
+  // simple UI prompt to create/remove/manage share
+  if(existingToken){ // manage existing
+    const action = prompt('Share exists. Type UNSHARE to remove it, or leave blank to copy link.');
+    if(action && action.toUpperCase()==='UNSHARE'){
+      const { error } = await supabase.from(TABLE).update({ share_token: null, share_expires_at: null }).eq('id',fileId);
+      if(error) return alert('Failed to unshare: '+error.message);
+      alert('Unshared'); loadFiles(); return;
+    }
+    // otherwise copy link
+    const link = `${location.origin}${location.pathname}?share=${existingToken}`;
+    navigator.clipboard?.writeText(link).then(()=>alert('Share link copied to clipboard'));
+    return;
+  }
+  // create new share token
+  const token = genToken(28);
+  // optionally ask for expiry
+  const ttl = prompt('Optional: enter expiry in hours (leave blank for no expiry)');
+  let expires_at = null;
+  if(ttl){ const hrs = parseFloat(ttl); if(!isNaN(hrs) && hrs>0) expires_at = new Date(Date.now()+hrs*3600*1000).toISOString(); }
+  const { error } = await supabase.from(TABLE).update({ share_token: token, share_expires_at: expires_at }).eq('id',fileId);
+  if(error) return alert('Failed to create share: '+error.message);
+  const link = `${location.origin}${location.pathname}?share=${token}`;
+  try{ await navigator.clipboard.writeText(link); alert('Share link created and copied to clipboard'); }catch(e){ prompt('Share link:',link); }
+  loadFiles();
+}
+
+// --- HANDLE PUBLIC SHARE VIEW ---
+async function handleShareView(){
+  const params = new URLSearchParams(location.search);
+  const token = params.get('share');
+  if(!token) return false;
+
+  // fetch file with token and check expiry
+  const { data, error } = await supabase.from(TABLE).select('id,filename,mime_type,data_base64,share_expires_at,size_bytes,uploaded_at').eq('share_token',token).single();
+  if(error || !data) { showShareError('File not found or share has been removed.'); return true; }
+  if(data.share_expires_at && new Date(data.share_expires_at) < new Date()){ showShareError('Share link has expired.'); return true; }
+
+  // show public view
+  hide(landing); hide(appEl); hide(authModal);
+  show(document.getElementById('shareView'));
+  const info = document.getElementById('shareInfo'); info.textContent = `${data.filename} — ${formatBytes(data.size_bytes||0)} — uploaded ${new Date(data.uploaded_at).toLocaleString()}`;
+  const preview = document.getElementById('sharePreview'); preview.innerHTML='';
+  const actions = document.getElementById('shareActions'); actions.innerHTML='';
+
+  if(data.mime_type && data.mime_type.startsWith('image/')){
+    const blob = base64ToBlob(data.data_base64,data.mime_type); const url = URL.createObjectURL(blob); const img=document.createElement('img'); img.src=url; preview.appendChild(img);
+    const dl = document.createElement('button'); dl.textContent='Download'; dl.onclick=()=>{ const a=document.createElement('a'); a.href=url; a.download=data.filename; document.body.appendChild(a); a.click(); a.remove(); };
+    actions.appendChild(dl);
+  } else if(data.mime_type && (data.mime_type.startsWith('text/')||data.mime_type.includes('json')||data.mime_type.includes('xml'))){
+    const text = atob(data.data_base64);
+    const pre = document.createElement('pre'); pre.textContent = text.slice(0,200000); preview.appendChild(pre);
+    const dl = document.createElement('button'); dl.textContent='Download'; dl.onclick=()=>{ const blob = base64ToBlob(data.data_base64,data.mime_type); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=data.filename; document.body.appendChild(a); a.click(); a.remove(); };
+    actions.appendChild(dl);
+  } else {
+    preview.textContent='Preview not available for this file type.';
+    const dl = document.createElement('button'); dl.textContent='Download'; dl.onclick=()=>{ const blob = base64ToBlob(data.data_base64,data.mime_type); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=data.filename; document.body.appendChild(a); a.click(); a.remove(); };
+    actions.appendChild(dl);
+  }
+  return true;
+}
+
+function showShareError(msg){ hide(landing); hide(appEl); hide(authModal); show(document.getElementById('shareView')); document.getElementById('shareInfo').textContent = msg; document.getElementById('sharePreview').innerHTML = ''; document.getElementById('shareActions').innerHTML=''; }
+
+// --- INIT ---
+(async function init(){
+  // check if ?share= token present — if yes show public share
+  const isShare = await handleShareView();
+  if(isShare) return;
+  // otherwise show landing and wire up UI
+  openAuthBtn.classList.remove('hidden');
+  // optional: restore existing session by checking localStorage
+  // (this demo uses simple user rows; production should use supabase auth and sessions)
+})();
+</script>
+</body>
+</html>
